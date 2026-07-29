@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* 외부 폰트 CDN을 쓰지 않는다.
+   OptiQR은 "페이지를 여는 동안 어떤 외부 요청도 발생하지 않는다"를 전제로 하는 도구라
+   Google Fonts import 한 줄이 그 전제를 깬다.
+   설치돼 있으면 Pretendard를 쓰고, 없으면 각 OS의 기본 한글 서체로 떨어진다. */
+@theme {
+  --font-sans:
+    "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", ui-sans-serif,
+    system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 숫자가 흔들리지 않게 (품질 점수·칸 수 표시용) */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
