@@ -34,11 +34,20 @@ export interface Logo {
   padColor: string;
 }
 
+export const FUNC_NONE = 0;
+export const FUNC_FINDER = 1; // 위치 검출 패턴 + 분리자
+export const FUNC_TIMING = 2; // 타이밍 패턴
+export const FUNC_ALIGN = 3; // 정렬 패턴
+export const FUNC_FORMAT = 4; // 포맷 정보 + 버전 정보 + 다크 모듈
+
 export interface QRResult {
   size: number;
   modules: boolean[][];
-  /** 기능 패턴(위치·정렬·타이밍) 여부. ECC 보호 대상이 아니다. */
-  funcMap: boolean[][];
+  /** 기능 패턴 종류(FUNC_*). ECC 보호 대상이 아니다.
+   *  종류에 따라 로고가 가렸을 때의 치명도가 다르다 — 위치 검출·타이밍·포맷은
+   *  하나라도 가려지면 치명적이지만, 정렬 패턴은 여러 개 중 일부가 가려져도
+   *  나머지로 격자를 외삽할 수 있다. */
+  funcMap: number[][];
   /** 모듈이 속한 코드워드 번호. 로고 손상량 계산에 쓴다. -1은 데이터 아님. */
   cwMap: number[][];
   numBlocks: number;

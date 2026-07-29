@@ -1,6 +1,7 @@
 /* ISO/IEC 18004 QR 인코더 — numeric / alphanumeric / byte 모드.
    품질 검사기가 cwMap(코드워드 배치)과 funcMap(기능 패턴 위치)을 직접 참조하므로
    qr-code-styling 등 외부 렌더러로 교체할 수 없다. 자세한 이유는 HANDOFF.md 3-1 참고. */
+import { FUNC_ALIGN, FUNC_FINDER, FUNC_FORMAT, FUNC_NONE, FUNC_TIMING } from "./types";
 import type { Ecl, Mode, QRResult } from "./types";
 
 export const ECC_CW_PER_BLOCK = [
@@ -65,7 +66,7 @@ export function numDataCodewords(ver: number, ord: number): number {
     ECC_CW_PER_BLOCK[ord][ver] * NUM_ECC_BLOCKS[ord][ver]
   );
 }
-function alignPositions(ver: number): number[] {
+export function alignPositions(ver: number): number[] {
   if (ver === 1) return [];
   const n = Math.floor(ver / 7) + 2;
   const step = ver === 32 ? 26 : Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2;
@@ -160,26 +161,29 @@ export function encodeQR(text: string, eclKey: Ecl): QRResult {
   const modules: boolean[][] = Array.from({ length: size }, () =>
     new Array(size).fill(false)
   );
-  const isFunc: boolean[][] = Array.from({ length: size }, () =>
-    new Array(size).fill(false)
+  const isFunc: number[][] = Array.from({ length: size }, () =>
+    new Array(size).fill(FUNC_NONE)
   );
 
-  const setF = (x: number, y: number, v: boolean) => {
+  const setF = (x: number, y: number, v: boolean, kind: number) => {
     modules[y][x] = v;
-    isFunc[y][x] = true;
+    isFunc[y][x] = kind;
   };
 
-  // finders + separators
+  // finders + separators (9x9 영역 전체 — 분리자 포함)
   const finder = (cx: number, cy: number) => {
     for (let dy = -4; dy <= 4; dy++)
       for (let dx = -4; dx <= 4; dx++) {
         const d = Math.max(Math.abs(dx), Math.abs(dy));
         const x = cx + dx, y = cy + dy;
-        if (x >= 0 && x < size && y >= 0 && y < size) setF(x, y, d !== 2 && d !== 4);
+        if (x >= 0 && x < size && y >= 0 && y < size) setF(x, y, d !== 2 && d !== 4, FUNC_FINDER);
       }
   };
   // timing
-  for (let i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+  for (let i = 0; i < size; i++) {
+    setF(6, i, i % 2 === 0, FUNC_TIMING);
+    setF(i, 6, i % 2 === 0, FUNC_TIMING);
+  }
   finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
   // alignment
   const ap = alignPositions(ver);
@@ -188,7 +192,7 @@ export function encodeQR(text: string, eclKey: Ecl): QRResult {
       if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) continue;
       for (let dy = -2; dy <= 2; dy++)
         for (let dx = -2; dx <= 2; dx++)
-          setF(ap[j] + dx, ap[i] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+          setF(ap[j] + dx, ap[i] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1, FUNC_ALIGN);
     }
   // version info
   if (ver >= 7) {
@@ -198,7 +202,7 @@ export function encodeQR(text: string, eclKey: Ecl): QRResult {
     for (let i = 0; i < 18; i++) {
       const bit = ((vbits >>> i) & 1) === 1;
       const a = size - 11 + (i % 3), b = Math.floor(i / 3);
-      setF(a, b, bit); setF(b, a, bit);
+      setF(a, b, bit, FUNC_FORMAT); setF(b, a, bit, FUNC_FORMAT);
     }
   }
   const drawFormat = (mask: number) => {
@@ -207,12 +211,12 @@ export function encodeQR(text: string, eclKey: Ecl): QRResult {
     for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
     const bits = ((data << 10) | rem) ^ 0x5412;
     const g = (i: number) => ((bits >>> i) & 1) === 1;
-    for (let i = 0; i <= 5; i++) setF(8, i, g(i));
-    setF(8, 7, g(6)); setF(8, 8, g(7)); setF(7, 8, g(8));
-    for (let i = 9; i < 15; i++) setF(14 - i, 8, g(i));
-    for (let i = 0; i < 8; i++) setF(size - 1 - i, 8, g(i));
-    for (let i = 8; i < 15; i++) setF(8, size - 15 + i, g(i));
-    setF(8, size - 8, true);
+    for (let i = 0; i <= 5; i++) setF(8, i, g(i), FUNC_FORMAT);
+    setF(8, 7, g(6), FUNC_FORMAT); setF(8, 8, g(7), FUNC_FORMAT); setF(7, 8, g(8), FUNC_FORMAT);
+    for (let i = 9; i < 15; i++) setF(14 - i, 8, g(i), FUNC_FORMAT);
+    for (let i = 0; i < 8; i++) setF(size - 1 - i, 8, g(i), FUNC_FORMAT);
+    for (let i = 8; i < 15; i++) setF(8, size - 15 + i, g(i), FUNC_FORMAT);
+    setF(8, size - 8, true, FUNC_FORMAT);
   };
   drawFormat(0);
 
@@ -230,7 +234,7 @@ export function encodeQR(text: string, eclKey: Ecl): QRResult {
         const x = right - j;
         const upward = ((right + 1) & 2) === 0;
         const y = upward ? size - 1 - vert : vert;
-        if (!isFunc[y][x] && idx < all.length * 8) {
+        if (isFunc[y][x] === FUNC_NONE && idx < all.length * 8) {
           modules[y][x] = ((all[idx >>> 3] >>> (7 - (idx & 7))) & 1) === 1;
           cwMap[y][x] = idx >>> 3;
           idx++;
@@ -252,7 +256,7 @@ export function encodeQR(text: string, eclKey: Ecl): QRResult {
   const applyMask = (m: number) => {
     for (let y = 0; y < size; y++)
       for (let x = 0; x < size; x++)
-        if (!isFunc[y][x] && maskFn[m](x, y)) modules[y][x] = !modules[y][x];
+        if (isFunc[y][x] === FUNC_NONE && maskFn[m](x, y)) modules[y][x] = !modules[y][x];
   };
 
   let best = 0, bestPenalty = Infinity;

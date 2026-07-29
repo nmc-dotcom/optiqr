@@ -1,5 +1,20 @@
+import { FUNC_ALIGN, FUNC_FINDER, FUNC_FORMAT, FUNC_TIMING } from "./types";
 import type { Design, Ecl, Issue, Level, Logo, QRResult, Report } from "./types";
-import { ECL_ORD, ccBits, encodePayloadBits, numDataCodewords, pickMode } from "./encoder";
+import { ECL_ORD, alignPositions, ccBits, encodePayloadBits, numDataCodewords, pickMode } from "./encoder";
+
+/* 정렬 패턴 중심 좌표 목록 (모서리 3곳과 겹치는 자리는 제외).
+   encoder.ts의 정렬 패턴 배치 루프와 동일한 규칙이어야 한다 — 여기서 어긋나면
+   "정렬 패턴 몇 개 중 몇 개가 가려졌는지" 집계가 실제 배치와 어긋난다. */
+function alignCenters(ver: number): { row: number; col: number }[] {
+  const ap = alignPositions(ver);
+  const out: { row: number; col: number }[] = [];
+  for (let i = 0; i < ap.length; i++)
+    for (let j = 0; j < ap.length; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) continue;
+      out.push({ row: ap[i], col: ap[j] });
+    }
+  return out;
+}
 
 function hexRgb(h: string): number[] {
   const s = h.replace("#", "");
@@ -65,7 +80,9 @@ export function logoDamage(qr: QRResult, logo: Logo, sizePct?: number) {
   const c = N / 2;
   const round = logo.pad > 0 && logo.padShape === "circle";
   const touched = new Set<number>();
-  let funcHit = 0, covered = 0;
+  const touchedAlign = new Set<string>();
+  const centers = alignCenters(qr.version);
+  let finderHit = 0, timingHit = 0, alignHit = 0, formatHit = 0, covered = 0;
 
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
@@ -75,8 +92,15 @@ export function logoDamage(qr: QRResult, logo: Logo, sizePct?: number) {
         : Math.abs(dx) <= half && Math.abs(dy) <= half;
       if (!inside) continue;
       covered++;
-      if (qr.funcMap[y][x]) funcHit++;
-      else if (qr.cwMap[y][x] >= 0) touched.add(qr.cwMap[y][x]);
+      const kind = qr.funcMap[y][x];
+      if (kind === FUNC_FINDER) finderHit++;
+      else if (kind === FUNC_TIMING) timingHit++;
+      else if (kind === FUNC_FORMAT) formatHit++;
+      else if (kind === FUNC_ALIGN) {
+        alignHit++;
+        const center = centers.find((ct) => Math.abs(x - ct.col) <= 2 && Math.abs(y - ct.row) <= 2);
+        if (center) touchedAlign.add(`${center.row},${center.col}`);
+      } else if (qr.cwMap[y][x] >= 0) touched.add(qr.cwMap[y][x]);
     }
   }
 
@@ -90,7 +114,12 @@ export function logoDamage(qr: QRResult, logo: Logo, sizePct?: number) {
   const cap = Math.max(1, Math.floor(qr.eccLen / 2));
   const worst = Math.max(...perBlock);
   return {
-    funcHit,
+    finderHit,
+    timingHit,
+    alignHit,
+    alignPatterns: touchedAlign.size,
+    alignPatternsTotal: centers.length,
+    formatHit,
     covered,
     damaged: touched.size,
     cap,
@@ -108,7 +137,9 @@ export function safeLogoSize(qr: QRResult, logo: Logo): number | null {
   for (let i = 0; i < 9; i++) {
     const mid = (lo + hi) / 2;
     const dmg = logoDamage(qr, logo, mid);
-    if (dmg.funcHit === 0 && dmg.load <= 0.6) { best = mid; lo = mid; } else hi = mid;
+    const fatalHit = dmg.finderHit > 0 || dmg.timingHit > 0 || dmg.formatHit > 0;
+    const allAlignGone = dmg.alignPatternsTotal > 0 && dmg.alignPatterns >= dmg.alignPatternsTotal;
+    if (!fatalHit && !allAlignGone && dmg.load <= 0.6) { best = mid; lo = mid; } else hi = mid;
   }
   return best;
 }
@@ -155,12 +186,32 @@ export function inspect(qr: QRResult, design: Design, logo: Logo): Report {
   if (logo.src) {
     const dmg = logoDamage(qr, logo);
 
-    if (dmg.funcHit > 0)
+    if (dmg.finderHit > 0 || dmg.timingHit > 0 || dmg.formatHit > 0) {
+      const hitNames: string[] = [];
+      if (dmg.finderHit > 0) hitNames.push(`위치 검출 패턴 ${dmg.finderHit}칸`);
+      if (dmg.timingHit > 0) hitNames.push(`타이밍 패턴 ${dmg.timingHit}칸`);
+      if (dmg.formatHit > 0) hitNames.push(`포맷·버전 정보 ${dmg.formatHit}칸`);
       add(
         "error",
         "기능 패턴 침범",
-        `로고가 위치·정렬·타이밍 패턴 ${dmg.funcHit}칸을 덮고 있습니다. 이 패턴은 오류 정정 대상이 아니라 ECC를 H로 올려도 복원되지 않습니다.`,
-        "로고를 줄이세요. 기능 패턴이 하나라도 가려지면 스캔이 불가능합니다."
+        `로고가 ${hitNames.join(", ")}을 덮고 있습니다. 이 패턴은 오류 정정 대상이 아니라 ECC를 H로 올려도 복원되지 않습니다.`,
+        "로고를 줄이세요. 위치 검출·타이밍·포맷 정보는 하나라도 가려지면 스캔이 불가능합니다."
+      );
+    }
+
+    if (dmg.alignPatternsTotal > 0 && dmg.alignPatterns >= dmg.alignPatternsTotal)
+      add(
+        "error",
+        "정렬 패턴 전부 가림",
+        `정렬 패턴 ${dmg.alignPatternsTotal}개가 모두 로고에 가려집니다. 남은 정렬 패턴이 없어 스캐너가 격자를 외삽할 근거가 사라집니다.`,
+        "로고를 줄여 정렬 패턴을 최소 하나는 남기세요."
+      );
+    else if (dmg.alignPatterns > 0)
+      add(
+        "warn",
+        "정렬 패턴 일부 가림",
+        `정렬 패턴 ${dmg.alignPatternsTotal}개 중 ${dmg.alignPatterns}개가 로고에 가려집니다. 대부분의 스캐너는 나머지 패턴으로 격자를 복원하지만, 인쇄 상태가 나쁘면 실패할 수 있습니다.`,
+        "여유가 있다면 로고를 줄이거나 정렬 패턴을 피해 배치하세요."
       );
 
     if (dmg.load >= 1)

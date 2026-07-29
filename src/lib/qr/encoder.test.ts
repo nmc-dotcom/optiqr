@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import jsQR from "jsqr";
 import QRCode from "qrcode";
-import { encodeQR } from "./encoder";
+import { alignPositions, encodeQR } from "./encoder";
+import { FUNC_ALIGN, FUNC_FINDER, FUNC_NONE, FUNC_TIMING } from "./types";
 import type { Ecl } from "./types";
 
 /* =========================================================================
@@ -198,24 +199,51 @@ describe("품질 검사가 참조하는 지도", () => {
     expect(qr.cwMap[0].length).toBe(qr.size);
   });
 
-  it("기능 패턴 모듈에는 코드워드 번호가 없다", () => {
+  it("기능 패턴 모듈(FUNC_NONE이 아님)에는 코드워드 번호가 없다", () => {
     const qr = encodeQR("https://holorado.me", "H");
     for (let y = 0; y < qr.size; y++) {
       for (let x = 0; x < qr.size; x++) {
-        if (qr.funcMap[y][x]) expect(qr.cwMap[y][x]).toBe(-1);
+        if (qr.funcMap[y][x] !== FUNC_NONE) expect(qr.cwMap[y][x]).toBe(-1);
       }
     }
   });
 
-  it("위치 검출 패턴 세 곳이 기능 패턴으로 표시된다", () => {
+  it("위치 검출 패턴 세 곳이 FUNC_FINDER로 표시된다", () => {
     const qr = encodeQR("https://holorado.me", "H");
     const n = qr.size;
     for (const [ox, oy] of [[0, 0], [n - 7, 0], [0, n - 7]]) {
       for (let y = 0; y < 7; y++) {
         for (let x = 0; x < 7; x++) {
-          expect(qr.funcMap[oy + y][ox + x]).toBe(true);
+          expect(qr.funcMap[oy + y][ox + x]).toBe(FUNC_FINDER);
         }
       }
     }
+  });
+
+  it("6번 행·열의 타이밍 모듈이 FUNC_TIMING이다 (위치 검출 패턴 영역 제외)", () => {
+    const qr = encodeQR("https://holorado.me", "H");
+    const n = qr.size;
+    for (let i = 8; i < n - 8; i++) {
+      expect(qr.funcMap[6][i]).toBe(FUNC_TIMING);
+      expect(qr.funcMap[i][6]).toBe(FUNC_TIMING);
+    }
+  });
+
+  it("v10에서 정렬 패턴 좌표 6·28·50 중 (28,28)이 FUNC_ALIGN이다", () => {
+    let text = "a";
+    while (encodeQR(text, "M").version < 10) text += "a";
+    const qr = encodeQR(text, "M");
+    expect(qr.version).toBe(10);
+    expect(alignPositions(10)).toEqual([6, 28, 50]);
+    expect(qr.funcMap[28][28]).toBe(FUNC_ALIGN);
+  });
+
+  it("v1은 정렬 패턴이 없다 (FUNC_ALIGN 없음)", () => {
+    const qr = encodeQR("a", "M");
+    expect(qr.version).toBe(1);
+    expect(alignPositions(1)).toEqual([]);
+    for (let y = 0; y < qr.size; y++)
+      for (let x = 0; x < qr.size; x++)
+        expect(qr.funcMap[y][x]).not.toBe(FUNC_ALIGN);
   });
 });
