@@ -306,18 +306,20 @@ function interleave(data: Uint8Array, ver: number, ord: number): number[] {
 
 function penalty(m: boolean[][], size: number): number {
   let p = 0, dark = 0;
+  // N3: 1:1:3:1:1 비율의 파인더 유사 패턴(10111010000 / 00001011101)을 11비트
+  // 슬라이딩 윈도우로 겹침 허용하며 찾는다. 정규식 match(/g)는 겹치는 매치를
+  // 건너뛰어 과소 집계하므로 쓸 수 없다 — 다른 구현과 마스크 선택이 갈리는 원인이었다.
   const runScan = (get: (a: number, b: number) => boolean) => {
     for (let a = 0; a < size; a++) {
       let run = 1, prev = get(a, 0);
-      const line = [prev ? 1 : 0];
+      let bits = prev ? 1 : 0;
       for (let b = 1; b < size; b++) {
         const cur = get(a, b);
-        line.push(cur ? 1 : 0);
         if (cur === prev) { run++; } else { if (run >= 5) p += 3 + (run - 5); run = 1; prev = cur; }
+        bits = ((bits << 1) & 0x7ff) | (cur ? 1 : 0);
+        if (b >= 10 && (bits === 0x5d0 || bits === 0x05d)) p += 40;
       }
       if (run >= 5) p += 3 + (run - 5);
-      const s = line.join("");
-      p += 40 * ((s.match(/10111010000/g) || []).length + (s.match(/00001011101/g) || []).length);
     }
   };
   runScan((a, b) => m[a][b]);
@@ -329,6 +331,6 @@ function penalty(m: boolean[][], size: number): number {
     }
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (m[y][x]) dark++;
   const ratio = (dark * 100) / (size * size);
-  p += Math.floor(Math.abs(ratio - 50) / 5) * 10;
+  p += Math.abs(Math.ceil(ratio / 5) - 10) * 10;
   return p;
 }
