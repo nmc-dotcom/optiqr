@@ -182,23 +182,19 @@ export default function QRStudio() {
       <header style={{ borderBottom: `1px solid ${C.line}`, background: C.paper }}>
         <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-3 px-5 py-5">
           <div>
-            <div className="flex items-baseline gap-2">
-              <h1 className="text-xl font-bold tracking-tight">OptiQR</h1>
-              <span className="text-xs" style={{ color: C.terra, fontFamily: MONO }}>
-                Phase 1
-              </span>
-            </div>
+            <h1 className="text-xl font-bold tracking-tight">OptiQR</h1>
             <p className="mt-1 text-xs" style={{ color: C.inkSoft }}>
               브라우저에서만 동작합니다. 입력한 데이터는 서버로 전송되지 않습니다.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: C.inkSoft }}>
-            <span
-              className="rounded px-2 py-1"
+            <a
+              href="https://holorado.me"
+              className="rounded px-2 py-1 transition-opacity hover:opacity-80"
               style={{ background: C.greenPale, color: C.green, fontFamily: MONO }}
             >
-              holorado.me
-            </span>
+              홀로라도 홈
+            </a>
           </div>
         </div>
       </header>
@@ -305,8 +301,31 @@ export default function QRStudio() {
         </div>
       </main>
 
-      <footer className="mx-auto max-w-6xl px-5 pb-12">
-        {/* TODO(T6): privacy.html / guide.html 링크 (AdSense 심사용) */}
+      <footer style={{ borderTop: `1px solid ${C.line}`, background: C.paper }}>
+        <div className="mx-auto max-w-6xl px-5 py-8 text-center text-xs" style={{ color: C.inkSoft }}>
+          <p>
+            <span className="font-semibold" style={{ color: C.ink }}>
+              OptiQR
+            </span>{" "}
+            · QR 코드를 만들고, 실제로 읽히는지 확인하세요
+          </p>
+          <p className="mt-2">© 2026 Holorado Tools Ecosystem. All Rights Reserved.</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+            <a href="https://holorado.me" className="hover:underline" style={{ color: C.green }}>
+              홀로라도 홈
+            </a>
+            <span style={{ color: C.line }}>·</span>
+            <a
+              href="https://holorado.me/privacy"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline"
+              style={{ color: C.green }}
+            >
+              개인정보처리방침
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );
