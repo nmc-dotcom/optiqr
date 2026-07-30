@@ -112,8 +112,8 @@ export function QualityPanel({ report }: { report: Report | null }) {
       </ul>
 
       <p className="mt-4 text-xs leading-relaxed" style={{ color: C.inkSoft, opacity: 0.8 }}>
-        이 점수는 QR 규격과 명암비 계산에 근거한 예측입니다. 실제 인식 여부를 보장하지는
-        않습니다.
+        이 점수는 QR 규격과 명암비 계산에 근거한 예측이며, 인쇄·오염·저조도까지 감안해 보수적으로
+        판정합니다. 실제 인식 여부를 보장하지도, 실패를 단정하지도 않습니다.
       </p>
     </Card>
   );

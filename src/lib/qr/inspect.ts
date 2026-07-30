@@ -220,10 +220,11 @@ export function inspect(qr: QRResult, design: Design, logo: Logo): Report {
         "복원 한계 초과",
         `로고가 코드워드 ${dmg.damaged}개를 손상시킵니다. 블록당 최대 손상이 ${dmg.worst}개인데 정정 한도는 ${dmg.cap}개입니다(한도의 ${(dmg.load * 100).toFixed(0)}%). 면적은 ${(dmg.areaPct * 100).toFixed(1)}%로 작아 보여도 경계가 코드워드를 잘게 걸쳐 손상량이 훨씬 큽니다.`,
         (() => {
-          const s = safeLogoSize(qr, logo);
-          return s
-            ? `로고 크기를 ${(s * 100).toFixed(0)}% 이하로 줄이거나, 보호 여백을 줄이세요.`
+          const base = safeLogoSize(qr, logo);
+          const suggestion = base
+            ? `로고 크기를 ${(base * 100).toFixed(0)}% 이하로 줄이거나, 보호 여백을 줄이세요.`
             : "로고 크기와 보호 여백을 모두 크게 줄이세요.";
+          return `${suggestion} 여유분은 인쇄 번짐·오염·비스듬한 각도를 위한 것이라, 화면에서 읽힌다고 안전한 것은 아닙니다.`;
         })()
       );
     else if (dmg.load >= 0.7)

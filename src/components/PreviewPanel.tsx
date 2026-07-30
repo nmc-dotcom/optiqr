@@ -62,7 +62,8 @@ export function PreviewPanel({
           className="mt-3 rounded px-3 py-2.5 text-xs font-semibold leading-relaxed"
           style={{ background: "#F6E3E1", color: C.red, border: "1px solid #E9C9C4" }}
         >
-          지금 설정으로는 스캔되지 않습니다. 아래 오류 항목을 먼저 고치세요.
+          복원 여력을 넘어섰습니다. 화면에서 읽히더라도 인쇄물이나 저조도에서 실패할 수 있으니,
+          저장 전에 실제 환경에서 확인하세요.
         </div>
       )}
 
